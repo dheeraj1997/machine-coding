@@ -1,29 +1,28 @@
 package org.example.part1;
 
-import java.math.BigDecimal;
-
 public class Part1Demo {
+
+    private static final long HOUR = 60 * 60 * 1000L;
 
     public static void main(String[] args) {
         DeliveryService service = new DeliveryService();
 
-        // Add drivers
-        service.addDriver("D1");
-        service.addDriver("D2");
-        service.addDriver("D3");
+        // Add drivers with hourly rates
+        service.addDriver("D1", 15.00);  // $15/hour
+        service.addDriver("D2", 20.00);  // $20/hour
+        service.addDriver("D3", 12.50);  // $12.50/hour
 
-        // Add deliveries (startTime, endTime, cost)
-        service.addDelivery("D1", 0, 30, 30.50);
-        service.addDelivery("D1", 45, 60, 15.25);
-        service.addDelivery("D2", 10, 50, 40.75);
-        service.addDelivery("D3", 5, 25, 20.00);
+        // Add deliveries (startTime, endTime) - cost calculated from hourly rate
+        service.addDelivery("D1", 0, 2 * HOUR);           // 2 hours * $15 = $30
+        service.addDelivery("D1", 3 * HOUR, 4 * HOUR);    // 1 hour * $15 = $15
+        service.addDelivery("D2", 1 * HOUR, 3 * HOUR);    // 2 hours * $20 = $40
+        service.addDelivery("D3", 0, 2 * HOUR);           // 2 hours * $12.50 = $25
 
         // Get total cost - O(1) operation
-        System.out.println("Total Cost: " + service.getTotalCost()); // Expected: 105
+        System.out.println("Total Cost: " + service.getTotalCost()); // Expected: 110
 
         // Additional info
-        System.out.println("Driver D1 deliveries: " + service.getDeliveryCountForDriver("D1"));
         System.out.println("Total drivers: " + service.getDriverCount());
-        System.out.println("Total deliveries: " + service.getTotalDeliveryCount());
+        System.out.println("D1 hourly rate: " + service.getDriver("D1").getHourlyRate());
     }
 }

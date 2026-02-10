@@ -12,6 +12,7 @@ public class Delivery {
     private final long startTime;
     private final long endTime;
     private final BigDecimal cost;
+    private boolean paid;
 
     public Delivery(String driverId, long startTime, long endTime, BigDecimal cost) {
         this.id = ID_GENERATOR.incrementAndGet();
@@ -19,6 +20,7 @@ public class Delivery {
         this.startTime = startTime;
         this.endTime = endTime;
         this.cost = cost;
+        this.paid = false;
     }
 
     public long getId() {
@@ -47,6 +49,14 @@ public class Delivery {
 
     public boolean overlapsWith(Delivery other) {
         return this.startTime < other.endTime && other.startTime < this.endTime;
+    }
+
+    public boolean isPaid() {
+        return paid;
+    }
+
+    public void markPaid() {
+        this.paid = true;
     }
 
     @Override

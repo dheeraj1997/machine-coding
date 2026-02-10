@@ -8,29 +8,33 @@ public class DeliveryService {
 
     private final Map<String, Driver> drivers;
     private final List<Delivery> deliveries;
-    private final Set<Long> paidDeliveryIds;
     private BigDecimal totalCost;
     private BigDecimal paidCost;
 
     public DeliveryService() {
         this.drivers = new HashMap<>();
         this.deliveries = new ArrayList<>();
-        this.paidDeliveryIds = new HashSet<>();
         this.totalCost = BigDecimal.ZERO;
         this.paidCost = BigDecimal.ZERO;
     }
 
-    public void addDriver(String driverId) {
+    private static final long MILLIS_PER_HOUR = 60 * 60 * 1000L;
+
+    public void addDriver(String driverId, double hourlyRate) {
         if (driverId == null || driverId.isBlank()) {
             throw new IllegalArgumentException("Driver ID cannot be null or empty");
         }
         if (drivers.containsKey(driverId)) {
             throw new IllegalArgumentException("Driver already exists: " + driverId);
         }
-        drivers.put(driverId, new Driver(driverId));
+        if (hourlyRate < 0) {
+            throw new IllegalArgumentException("Hourly rate cannot be negative");
+        }
+        BigDecimal rate = BigDecimal.valueOf(hourlyRate).setScale(2, RoundingMode.HALF_UP);
+        drivers.put(driverId, new Driver(driverId, rate));
     }
 
-    public void addDelivery(String driverId, long startTime, long endTime, double cost) {
+    public void addDelivery(String driverId, long startTime, long endTime) {
         if (!drivers.containsKey(driverId)) {
             throw new IllegalArgumentException("Driver not found: " + driverId);
         }
@@ -40,14 +44,15 @@ public class DeliveryService {
         if (endTime < startTime) {
             throw new IllegalArgumentException("End time cannot be before start time");
         }
-        if (cost < 0) {
-            throw new IllegalArgumentException("Cost cannot be negative");
-        }
 
-        BigDecimal normalizedCost = BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP);
-        Delivery delivery = new Delivery(driverId, startTime, endTime, normalizedCost);
+        Driver driver = drivers.get(driverId);
+        BigDecimal durationHours = BigDecimal.valueOf(endTime - startTime)
+                .divide(BigDecimal.valueOf(MILLIS_PER_HOUR), 10, RoundingMode.HALF_UP);
+        BigDecimal cost = driver.getHourlyRate().multiply(durationHours).setScale(2, RoundingMode.HALF_UP);
+
+        Delivery delivery = new Delivery(driverId, startTime, endTime, cost);
         deliveries.add(delivery);
-        totalCost = totalCost.add(normalizedCost).setScale(2, RoundingMode.HALF_UP);
+        totalCost = totalCost.add(cost).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getTotalCost() {
@@ -58,9 +63,9 @@ public class DeliveryService {
         BigDecimal amountPaid = BigDecimal.ZERO;
 
         for (Delivery delivery : deliveries) {
-            if (!paidDeliveryIds.contains(delivery.getId()) && delivery.getEndTime() <= upToTime) {
+            if (!delivery.isPaid() && delivery.getEndTime() <= upToTime) {
                 amountPaid = amountPaid.add(delivery.getCost());
-                paidDeliveryIds.add(delivery.getId());
+                delivery.markPaid();
             }
         }
 

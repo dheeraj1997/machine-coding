@@ -4,41 +4,43 @@ import java.math.BigDecimal;
 
 public class Part2Demo {
 
+    private static final long HOUR = 60 * 60 * 1000L;
+
     public static void main(String[] args) {
         DeliveryService service = new DeliveryService();
 
-        // Add drivers
-        service.addDriver("D1");
-        service.addDriver("D2");
+        // Add drivers with hourly rates
+        service.addDriver("D1", 15.00);  // $15/hour
+        service.addDriver("D2", 20.00);  // $20/hour
 
-        // Add deliveries (startTime, endTime, cost)
-        service.addDelivery("D1", 0, 30, 30.50);    // ends at 30
-        service.addDelivery("D1", 45, 60, 15.25);   // ends at 60
-        service.addDelivery("D2", 10, 50, 40.75);   // ends at 50
-        service.addDelivery("D2", 70, 100, 30.00);  // ends at 100
+        // Add deliveries - cost calculated from hourly rate * duration
+        service.addDelivery("D1", 0, 2 * HOUR);           // 2h * $15 = $30, ends at hour 2
+        service.addDelivery("D1", 3 * HOUR, 4 * HOUR);    // 1h * $15 = $15, ends at hour 4
+        service.addDelivery("D2", 1 * HOUR, 3 * HOUR);    // 2h * $20 = $40, ends at hour 3
+        service.addDelivery("D2", 5 * HOUR, 7 * HOUR);    // 2h * $20 = $40, ends at hour 7
 
         System.out.println("=== Initial State ===");
-        System.out.println("Total Cost: " + service.getTotalCost());           // 115
-        System.out.println("Cost to be Paid: " + service.getCostToBePaid());   // 115
+        System.out.println("Total Cost: " + service.getTotalCost());           // $125
+        System.out.println("Cost to be Paid: " + service.getCostToBePaid());
 
-        System.out.println("\n=== Pay up to time 50 ===");
-        BigDecimal paid1 = service.payUpToTime(50);  // Settles: D1(0-30), D2(10-50)
-        System.out.println("Amount Paid: " + paid1);
-        System.out.println("Cost to be Paid: " + service.getCostToBePaid());   // 45
+        System.out.println("\n=== Pay up to hour 3 ===");
+        BigDecimal paid1 = service.payUpToTime(3 * HOUR);  // Settles: D1(0-2h)=$30, D2(1-3h)=$40
+        System.out.println("Amount Paid: " + paid1);       // $70
+        System.out.println("Cost to be Paid: " + service.getCostToBePaid());
 
-        System.out.println("\n=== Pay up to time 60 ===");
-        BigDecimal paid2 = service.payUpToTime(60);  // Settles: D1(45-60)
-        System.out.println("Amount Paid: " + paid2);
-        System.out.println("Cost to be Paid: " + service.getCostToBePaid());   // 30
+        System.out.println("\n=== Pay up to hour 5 ===");
+        BigDecimal paid2 = service.payUpToTime(5 * HOUR);  // Settles: D1(3-4h)=$15
+        System.out.println("Amount Paid: " + paid2);       // $15
+        System.out.println("Cost to be Paid: " + service.getCostToBePaid());
 
-        System.out.println("\n=== Pay up to time 100 ===");
-        BigDecimal paid3 = service.payUpToTime(100); // Settles: D2(70-100)
-        System.out.println("Amount Paid: " + paid3);
-        System.out.println("Cost to be Paid: " + service.getCostToBePaid());   // 0
+        System.out.println("\n=== Pay up to hour 10 ===");
+        BigDecimal paid3 = service.payUpToTime(10 * HOUR); // Settles: D2(5-7h)=$40
+        System.out.println("Amount Paid: " + paid3);       // $40
+        System.out.println("Cost to be Paid: " + service.getCostToBePaid());   // $0
 
         System.out.println("\n=== Final State ===");
-        System.out.println("Total Cost: " + service.getTotalCost());           // 115
-        System.out.println("Total Paid: " + service.getPaidCost());            // 115
-        System.out.println("Remaining: " + service.getCostToBePaid());         // 0
+        System.out.println("Total Cost: " + service.getTotalCost());
+        System.out.println("Total Paid: " + service.getPaidCost());
+        System.out.println("Remaining: " + service.getCostToBePaid());
     }
 }
