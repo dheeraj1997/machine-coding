@@ -1,16 +1,27 @@
 package org.example.part3;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class DeliveryService {
 
+    private static final long MILLIS_PER_HOUR = 60 * 60 * 1000L;
+    private static final long MAX_DELIVERY_DURATION = 3;
+    private static final long MAX_DELIVERY_DURATION_MILLIS = MAX_DELIVERY_DURATION * MILLIS_PER_HOUR;
+    private static final long TWENTY_FOUR_HOURS_MILLIS = 24 * MILLIS_PER_HOUR;
+
     private final Map<String, Driver> drivers;
+    private final List<Delivery> deliveries;
+    private final Set<Long> paidDeliveryIds;
     private BigDecimal totalCost;
     private BigDecimal paidCost;
 
     public DeliveryService() {
         this.drivers = new HashMap<>();
+        this.deliveries = new ArrayList<>();
+        this.paidDeliveryIds = new HashSet<>();
         this.totalCost = BigDecimal.ZERO;
         this.paidCost = BigDecimal.ZERO;
     }
@@ -25,7 +36,7 @@ public class DeliveryService {
         drivers.put(driverId, new Driver(driverId));
     }
 
-    public void addDelivery(String driverId, long startTime, long endTime, BigDecimal cost) {
+    public void addDelivery(String driverId, long startTime, long endTime, double cost) {
         if (!drivers.containsKey(driverId)) {
             throw new IllegalArgumentException("Driver not found: " + driverId);
         }
@@ -35,14 +46,18 @@ public class DeliveryService {
         if (endTime < startTime) {
             throw new IllegalArgumentException("End time cannot be before start time");
         }
-        if (cost == null || cost.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Cost cannot be null or negative");
+        if (cost < 0) {
+            throw new IllegalArgumentException("Cost cannot be negative");
+        }
+        long durationMillis = endTime - startTime;
+        if (durationMillis > MAX_DELIVERY_DURATION_MILLIS) {
+            throw new IllegalArgumentException("Delivery duration cannot exceed " + MAX_DELIVERY_DURATION + " hours");
         }
 
-        Delivery delivery = new Delivery(startTime, endTime, cost);
-        drivers.get(driverId).addDelivery(delivery);
-
-        totalCost = totalCost.add(cost);
+        BigDecimal normalizedCost = BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP);
+        Delivery delivery = new Delivery(driverId, startTime, endTime, normalizedCost);
+        deliveries.add(delivery);
+        totalCost = totalCost.add(normalizedCost).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getTotalCost() {
@@ -52,87 +67,69 @@ public class DeliveryService {
     public BigDecimal payUpToTime(long upToTime) {
         BigDecimal amountPaid = BigDecimal.ZERO;
 
-        for (Driver driver : drivers.values()) {
-            for (Delivery delivery : driver.getDeliveries()) {
-                if (!delivery.isPaid() && delivery.getEndTime() <= upToTime) {
-                    amountPaid = amountPaid.add(delivery.getCost());
-                    delivery.markPaid();
-                }
+        for (Delivery delivery : deliveries) {
+            if (!paidDeliveryIds.contains(delivery.getId()) && delivery.getEndTime() <= upToTime) {
+                amountPaid = amountPaid.add(delivery.getCost());
+                paidDeliveryIds.add(delivery.getId());
             }
         }
 
-        paidCost = paidCost.add(amountPaid);
-        return amountPaid;
+        paidCost = paidCost.add(amountPaid).setScale(2, RoundingMode.HALF_UP);
+        return amountPaid.setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getCostToBePaid() {
-        return totalCost.subtract(paidCost);
+        return totalCost.subtract(paidCost).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getPaidCost() {
         return paidCost;
     }
 
-    /**
-     * Get maximum number of simultaneous deliveries happening at any point in time.
-     * Uses sweep line algorithm - O(n log n) where n = total deliveries.
-     */
-    public int getMaxSimultaneousDeliveries() {
-        List<int[]> events = new ArrayList<>();
+    public int getMaxSimultaneousDeliveries(long timestamp) {
+        long windowStart = timestamp - TWENTY_FOUR_HOURS_MILLIS;
+        long windowEnd = timestamp;
 
-        for (Driver driver : drivers.values()) {
-            for (Delivery delivery : driver.getDeliveries()) {
-                events.add(new int[]{(int) delivery.getStartTime(), 1});  // +1 at start
-                events.add(new int[]{(int) delivery.getEndTime(), -1});   // -1 at end
+        List<long[]> events = new ArrayList<>();
+
+        for (Delivery delivery : deliveries) {
+            if (delivery.getStartTime() < windowEnd && delivery.getEndTime() > windowStart) {
+                long effectiveStart = Math.max(delivery.getStartTime(), windowStart);
+                long effectiveEnd = Math.min(delivery.getEndTime(), windowEnd);
+
+                events.add(new long[]{effectiveStart, 1});
+                events.add(new long[]{effectiveEnd, -1});
             }
         }
 
-        // Sort by time; if same time, process ends (-1) before starts (+1)
         events.sort((a, b) -> {
-            if (a[0] != b[0]) return a[0] - b[0];
-            return a[1] - b[1];
+            if (a[0] != b[0]) return Long.compare(a[0], b[0]);
+            return Long.compare(a[1], b[1]);
         });
 
         int maxConcurrent = 0;
         int current = 0;
 
-        for (int[] event : events) {
-            current += event[1];
+        for (long[] event : events) {
+            current += (int) event[1];
             maxConcurrent = Math.max(maxConcurrent, current);
         }
 
         return maxConcurrent;
     }
 
-    /**
-     * Get all deliveries that are active (in progress) at a specific time.
-     */
-    public List<DeliveryInfo> getDeliveriesAtTime(long time) {
-        List<DeliveryInfo> result = new ArrayList<>();
-
-        for (Driver driver : drivers.values()) {
-            for (Delivery delivery : driver.getDeliveries()) {
-                if (delivery.getStartTime() <= time && time < delivery.getEndTime()) {
-                    result.add(new DeliveryInfo(driver.getDriverId(), delivery));
-                }
-            }
-        }
-
-        return result;
+    public List<Delivery> getDeliveriesAtTime(long time) {
+        return deliveries.stream()
+                .filter(d -> d.getStartTime() <= time && time < d.getEndTime())
+                .collect(Collectors.toList());
     }
 
-    /**
-     * Get count of simultaneous deliveries at each point where count changes.
-     * Returns a list of [time, count] showing how concurrent deliveries change over time.
-     */
     public List<long[]> getSimultaneousDeliveriesTimeline() {
         List<long[]> events = new ArrayList<>();
 
-        for (Driver driver : drivers.values()) {
-            for (Delivery delivery : driver.getDeliveries()) {
-                events.add(new long[]{delivery.getStartTime(), 1});
-                events.add(new long[]{delivery.getEndTime(), -1});
-            }
+        for (Delivery delivery : deliveries) {
+            events.add(new long[]{delivery.getStartTime(), 1});
+            events.add(new long[]{delivery.getEndTime(), -1});
         }
 
         events.sort((a, b) -> {
@@ -159,26 +156,11 @@ public class DeliveryService {
         return drivers.size();
     }
 
-    public static class DeliveryInfo {
-        private final String driverId;
-        private final Delivery delivery;
+    public int getTotalDeliveryCount() {
+        return deliveries.size();
+    }
 
-        public DeliveryInfo(String driverId, Delivery delivery) {
-            this.driverId = driverId;
-            this.delivery = delivery;
-        }
-
-        public String getDriverId() {
-            return driverId;
-        }
-
-        public Delivery getDelivery() {
-            return delivery;
-        }
-
-        @Override
-        public String toString() {
-            return "Driver=" + driverId + ", " + delivery;
-        }
+    public boolean isDeliveryPaid(String deliveryId) {
+        return paidDeliveryIds.contains(deliveryId);
     }
 }

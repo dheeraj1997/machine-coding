@@ -1,16 +1,22 @@
 package org.example.part1;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class DeliveryService {
 
     private final Map<String, Driver> drivers;
+    private final List<Delivery> deliveries;
     private BigDecimal totalCost;
 
     public DeliveryService() {
         this.drivers = new HashMap<>();
+        this.deliveries = new ArrayList<>();
         this.totalCost = BigDecimal.ZERO;
     }
 
@@ -24,7 +30,7 @@ public class DeliveryService {
         drivers.put(driverId, new Driver(driverId));
     }
 
-    public void addDelivery(String driverId, long startTime, long endTime, BigDecimal cost) {
+    public void addDelivery(String driverId, long startTime, long endTime, double cost) {
         if (!drivers.containsKey(driverId)) {
             throw new IllegalArgumentException("Driver not found: " + driverId);
         }
@@ -34,19 +40,17 @@ public class DeliveryService {
         if (endTime < startTime) {
             throw new IllegalArgumentException("End time cannot be before start time");
         }
-        if (cost == null || cost.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Cost cannot be null or negative");
+        if (cost < 0) {
+            throw new IllegalArgumentException("Cost cannot be negative");
         }
 
-        Delivery delivery = new Delivery(startTime, endTime, cost);
-        drivers.get(driverId).addDelivery(delivery);
-
-        // Compute cost at insertion time for O(1) getTotalCost
-        totalCost = totalCost.add(cost);
+        BigDecimal normalizedCost = BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP);
+        Delivery delivery = new Delivery(driverId, startTime, endTime, normalizedCost);
+        deliveries.add(delivery);
+        totalCost = totalCost.add(normalizedCost).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getTotalCost() {
-        // O(1) - cost is pre-computed during addDelivery
         return totalCost;
     }
 
@@ -56,5 +60,8 @@ public class DeliveryService {
 
     public int getDriverCount() {
         return drivers.size();
+    }
+    public int getTotalDeliveryCount() {
+        return deliveries.size();
     }
 }

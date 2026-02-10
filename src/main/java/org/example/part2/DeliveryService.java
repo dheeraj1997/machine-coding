@@ -1,17 +1,21 @@
 package org.example.part2;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.Map;
+import java.math.RoundingMode;
+import java.util.*;
 
 public class DeliveryService {
 
     private final Map<String, Driver> drivers;
+    private final List<Delivery> deliveries;
+    private final Set<Long> paidDeliveryIds;
     private BigDecimal totalCost;
     private BigDecimal paidCost;
 
     public DeliveryService() {
         this.drivers = new HashMap<>();
+        this.deliveries = new ArrayList<>();
+        this.paidDeliveryIds = new HashSet<>();
         this.totalCost = BigDecimal.ZERO;
         this.paidCost = BigDecimal.ZERO;
     }
@@ -26,7 +30,7 @@ public class DeliveryService {
         drivers.put(driverId, new Driver(driverId));
     }
 
-    public void addDelivery(String driverId, long startTime, long endTime, BigDecimal cost) {
+    public void addDelivery(String driverId, long startTime, long endTime, double cost) {
         if (!drivers.containsKey(driverId)) {
             throw new IllegalArgumentException("Driver not found: " + driverId);
         }
@@ -36,47 +40,36 @@ public class DeliveryService {
         if (endTime < startTime) {
             throw new IllegalArgumentException("End time cannot be before start time");
         }
-        if (cost == null || cost.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Cost cannot be null or negative");
+        if (cost < 0) {
+            throw new IllegalArgumentException("Cost cannot be negative");
         }
 
-        Delivery delivery = new Delivery(startTime, endTime, cost);
-        drivers.get(driverId).addDelivery(delivery);
-
-        // Compute cost at insertion time for O(1) getTotalCost
-        totalCost = totalCost.add(cost);
+        BigDecimal normalizedCost = BigDecimal.valueOf(cost).setScale(2, RoundingMode.HALF_UP);
+        Delivery delivery = new Delivery(driverId, startTime, endTime, normalizedCost);
+        deliveries.add(delivery);
+        totalCost = totalCost.add(normalizedCost).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getTotalCost() {
         return totalCost;
     }
 
-    /**
-     * Settle payment for all deliveries that ended on or before upToTime.
-     * Returns the amount paid in this settlement.
-     */
     public BigDecimal payUpToTime(long upToTime) {
         BigDecimal amountPaid = BigDecimal.ZERO;
 
-        for (Driver driver : drivers.values()) {
-            for (Delivery delivery : driver.getDeliveries()) {
-                if (!delivery.isPaid() && delivery.getEndTime() <= upToTime) {
-                    amountPaid = amountPaid.add(delivery.getCost());
-                    delivery.markPaid();
-                }
+        for (Delivery delivery : deliveries) {
+            if (!paidDeliveryIds.contains(delivery.getId()) && delivery.getEndTime() <= upToTime) {
+                amountPaid = amountPaid.add(delivery.getCost());
+                paidDeliveryIds.add(delivery.getId());
             }
         }
 
-        paidCost = paidCost.add(amountPaid);
-        return amountPaid;
+        paidCost = paidCost.add(amountPaid).setScale(2, RoundingMode.HALF_UP);
+        return amountPaid.setScale(2, RoundingMode.HALF_UP);
     }
 
-    /**
-     * Get remaining delivery costs that haven't been settled yet.
-     * O(1) operation.
-     */
     public BigDecimal getCostToBePaid() {
-        return totalCost.subtract(paidCost);
+        return totalCost.subtract(paidCost).setScale(2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal getPaidCost() {

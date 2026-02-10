@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 
 public class Part3Demo {
 
+    private static final long HOUR = 60 * 60 * 1000L; // 1 hour in milliseconds
+
     public static void main(String[] args) {
         DeliveryService service = new DeliveryService();
 
@@ -12,48 +14,52 @@ public class Part3Demo {
         service.addDriver("D2");
         service.addDriver("D3");
 
-        // Add deliveries with decimal costs
-        service.addDelivery("D1", 0, 30, new BigDecimal("25.50"));    // D1: 0-30
-        service.addDelivery("D1", 45, 70, new BigDecimal("15.75"));   // D1: 45-70
-        service.addDelivery("D2", 10, 50, new BigDecimal("40.25"));   // D2: 10-50
-        service.addDelivery("D2", 60, 80, new BigDecimal("30.00"));   // D2: 60-80
-        service.addDelivery("D3", 20, 65, new BigDecimal("55.99"));   // D3: 20-65
+        // Add deliveries with decimal costs (max 3 hours duration)
+        // Timestamps in milliseconds
+        service.addDelivery("D1", 5 * HOUR, 8 * HOUR, 25.50);     // D1: hour 5-8
+        service.addDelivery("D1", 20 * HOUR, 22 * HOUR, 15.75);   // D1: hour 20-22
+        service.addDelivery("D2", 6 * HOUR, 9 * HOUR, 40.25);     // D2: hour 6-9
+        service.addDelivery("D2", 21 * HOUR, 23 * HOUR, 30.00);   // D2: hour 21-23
+        service.addDelivery("D3", 7 * HOUR, 10 * HOUR, 55.99);    // D3: hour 7-10
+        service.addDelivery("D3", 30 * HOUR, 32 * HOUR, 20.00);   // D3: hour 30-32
 
         /*
-         * Timeline visualization:
-         * Time:  0----10----20----30----40----50----60----70----80
-         * D1:    [==========]          [==============]
-         * D2:         [==================]      [==========]
-         * D3:              [======================]
+         * Timeline visualization (hours):
+         * Hour:  5----6----7----8----9----10---...---20---21---22---23---...---30---32
+         * D1:    [=========]                        [====]
+         * D2:         [=========]                        [=========]
+         * D3:              [=========]                                   [====]
          *
-         * Concurrent deliveries at different times:
-         * t=5:  1 (D1)
-         * t=15: 2 (D1, D2)
-         * t=25: 3 (D1, D2, D3) <- MAX
-         * t=35: 2 (D2, D3)
-         * t=55: 2 (D1, D3)
-         * t=65: 2 (D1, D2)
+         * At hour 24, looking back 24 hours (window: hour 0-24):
+         * - D1(5-8), D1(20-22), D2(6-9), D2(21-23), D3(7-10) are in window
+         * - Max concurrent at hour 7-8: 3 (D1, D2, D3 overlap)
+         *
+         * At hour 36, looking back 24 hours (window: hour 12-36):
+         * - D1(20-22), D2(21-23), D3(30-32) are in window
+         * - Max concurrent at hour 21-22: 2 (D1, D2 overlap)
          */
 
         System.out.println("=== Decimal Cost Support ===");
-        System.out.println("Total Cost: " + service.getTotalCost());  // 167.49
+        System.out.println("Total Cost: " + service.getTotalCost());
 
-        System.out.println("\n=== Simultaneous Deliveries ===");
-        System.out.println("Max Simultaneous Deliveries: " + service.getMaxSimultaneousDeliveries());  // 3
+        System.out.println("\n=== Max Simultaneous Deliveries (within previous 24 hours) ===");
+        System.out.println("At hour 24 (window 0-24): " + service.getMaxSimultaneousDeliveries(24 * HOUR));
+        System.out.println("At hour 36 (window 12-36): " + service.getMaxSimultaneousDeliveries(36 * HOUR));
+        System.out.println("At hour 12 (window 0-12): " + service.getMaxSimultaneousDeliveries(12 * HOUR));
 
         System.out.println("\n=== Deliveries at specific times ===");
-        System.out.println("At time 25: " + service.getDeliveriesAtTime(25));
-        System.out.println("At time 55: " + service.getDeliveriesAtTime(55));
-        System.out.println("At time 75: " + service.getDeliveriesAtTime(75));
+        System.out.println("At hour 7: " + service.getDeliveriesAtTime(7 * HOUR));
+        System.out.println("At hour 21: " + service.getDeliveriesAtTime(21 * HOUR));
+        System.out.println("At hour 31: " + service.getDeliveriesAtTime(31 * HOUR));
 
         System.out.println("\n=== Payment with decimals ===");
-        BigDecimal paid = service.payUpToTime(50);
-        System.out.println("Paid up to time 50: " + paid);            // 65.75 (D1:25.50 + D2:40.25)
-        System.out.println("Remaining to pay: " + service.getCostToBePaid());  // 101.74
+        BigDecimal paid = service.payUpToTime(10 * HOUR);
+        System.out.println("Paid up to hour 10: " + paid);
+        System.out.println("Remaining to pay: " + service.getCostToBePaid());
 
         System.out.println("\n=== Timeline of concurrent deliveries ===");
         for (long[] point : service.getSimultaneousDeliveriesTimeline()) {
-            System.out.println("Time " + point[0] + ": " + point[1] + " concurrent deliveries");
+            System.out.println("Hour " + (point[0] / HOUR) + ": " + point[1] + " concurrent deliveries");
         }
     }
 }

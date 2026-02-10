@@ -1,17 +1,32 @@
 package org.example.part1;
 
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Delivery {
 
+    private static final AtomicLong ID_GENERATOR = new AtomicLong(0);
+
+    private final long id;
+    private final String driverId;
     private final long startTime;
     private final long endTime;
     private final BigDecimal cost;
 
-    public Delivery(long startTime, long endTime, BigDecimal cost) {
+    public Delivery(String driverId, long startTime, long endTime, BigDecimal cost) {
+        this.id = ID_GENERATOR.incrementAndGet();
+        this.driverId = driverId;
         this.startTime = startTime;
         this.endTime = endTime;
         this.cost = cost;
+    }
+
+    public long getId() {
+        return id;
+    }
+
+    public String getDriverId() {
+        return driverId;
     }
 
     public long getStartTime() {
@@ -28,5 +43,10 @@ public class Delivery {
 
     public long getDuration() {
         return endTime - startTime;
+    }
+
+    @Override
+    public String toString() {
+        return "Delivery[driver=" + driverId + ", " + startTime + "-" + endTime + ", cost=" + cost + "]";
     }
 }

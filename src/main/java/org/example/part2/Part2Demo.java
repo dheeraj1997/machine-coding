@@ -12,10 +12,10 @@ public class Part2Demo {
         service.addDriver("D2");
 
         // Add deliveries (startTime, endTime, cost)
-        service.addDelivery("D1", 0, 30, new BigDecimal("30.50"));    // ends at 30
-        service.addDelivery("D1", 45, 60, new BigDecimal("15.25"));   // ends at 60
-        service.addDelivery("D2", 10, 50, new BigDecimal("40.75"));   // ends at 50
-        service.addDelivery("D2", 70, 100, new BigDecimal("30.00"));  // ends at 100
+        service.addDelivery("D1", 0, 30, 30.50);    // ends at 30
+        service.addDelivery("D1", 45, 60, 15.25);   // ends at 60
+        service.addDelivery("D2", 10, 50, 40.75);   // ends at 50
+        service.addDelivery("D2", 70, 100, 30.00);  // ends at 100
 
         System.out.println("=== Initial State ===");
         System.out.println("Total Cost: " + service.getTotalCost());           // 115
